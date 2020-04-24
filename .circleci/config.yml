@@ -1,5 +1,3 @@
-version: 2
-
 # jobs:
 #     build:
 #         macos:
@@ -66,26 +64,25 @@ version: 2
 #                       command: |
 #                           sfdx force:org:delete -u circle_build_$CIRCLE_BUILD_NUM -p
 
-
 jobs:
-  install_authenticate:
-    executor: sfdx/default
-    steps:
-      - checkout
-      - sfdx/install
-      - sfdx/auth:
-          defaultusername:  $HUB_SFDC_USER
-      - run:
-          command: >
-            echo You now have access to the sfdx cli and may execute commands
-            against it.
+    install_authenticate:
+        executor: sfdx/default
+        steps:
+            - checkout
+            - sfdx/install
+            - sfdx/auth:
+                  defaultusername: $HUB_SFDC_USER
+            - run:
+                  command: >
+                      echo You now have access to the sfdx cli and may execute commands
+                      against it.
 
-            sfdx force:auth:list
-          name: Run your SFDX commands here
+                      sfdx force:auth:list
+                  name: Run your SFDX commands here
 orbs:
-  sfdx: circleci/salesforce-sfdx@x.y
+    sfdx: circleci/salesforce-sfdx@x.y
 version: 2.1
 workflows:
-  basic-test:
-    jobs:
-      - install_authenticate
+    basic-test:
+        jobs:
+            - install_authenticate
