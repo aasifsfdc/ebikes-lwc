@@ -1,69 +1,266 @@
 version: 2
 
-general:
-# Uncomment the following to specify only a specific branch
-#   branches:
-#     only:
-#       - dev # specific branch
-#       - /dev-.*/ # or regexes
-
 jobs:
-    # build:
-    #     machine: true
-    #     working_directory: ~/ci_app
-    #     environment:
-    #         # from https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_install_cli_standalone.htm
-    #         # and https://developer.salesforce.com/media/salesforce-cli/manifest.json
-    #         - DX_CLI_URL: https://developer.salesforce.com/media/salesforce-cli/sfdx-linux-amd64.tar.xz
-    steps:
-        - checkout
-        # - run:
-        #       name: Download CLI
-        #       command: |
-        #           mkdir sfdx
-        #           wget -qO- $DX_CLI_URL | tar xJ -C sfdx --strip-components 1
-        # - run:
-        #       name: Install CLI
-        #       command: |
-        #           ./sfdx/install
-        #           sfdx
-        #           mkdir tmp
-        # - run:
-        #       name: Create hub key
-        #       command: |
-        #           echo 'make hub key'
-        #           #- mkdir keys
-        #           #- echo $HUB_SERVER_KEY_HEX | xxd -r -ps >> keys/hub.key
-        #           openssl enc -nosalt -aes-256-cbc -d -in assets/server.key.enc -out assets/server.key -base64 -K $DECRYPTION_KEY -iv $DECRYPTION_IV
-        #           #- openssl rsa -in keys/hub.key -check -noout
-        ### Uncomment the following if performing deployments
-        #- echo 'make deploy key'
-        #- echo $DEPLOY_SERVER_KEY_HEX | xxd -r -ps >> keys/deploy.key
-        #- openssl rsa -in keys/deploy.key -check -noout
-        #- sfdx force:auth:jwt:grant --clientid $DEPLOY_CONSUMER_KEY --jwtkeyfile keys/deploy.key --username $DEPLOY_SFDC_USER -a deploy
-        - run:
-              name: Setup Org
-              command: |
-                  echo 'Running tests'
-                  sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile assets/server.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
-                  sfdx force --help
-                  sfdx force:org:create -s -f ~/ci_app/config/project-scratch-def.json -a circle_build_$CIRCLE_BUILD_NUM --wait 2
-                  sfdx force:source:push -u circle_build_$CIRCLE_BUILD_NUM
-        - run:
-              name: Run Apex Tests
-              command: |
-                  mkdir -p ~/junit
-                  sfdx force:apex:test:run -c -d ~/junit -r junit --wait 5
-        - store_test_results:
-              path: ~/junit
-        - run:
-              name: Delete Useless Scratch Org
-              command: |
-                  sfdx force:org:delete -u circle_build_$CIRCLE_BUILD_NUM -p
+    run_jest_tests:
+        docker:
+            - image: circleci/node:10.16.3
+            - image: mongo:4.2.0
+        steps:
+            - checkout
+            - run:
+                  name: update-npm
+                  command: 'sudo npm install -g npm@5'
+            - restore_cache:
+                  key: dependency-cache-{{ checksum "package-lock.json" }}
+            - run:
+                  name: install-npm-wee
+                  command: npm install
+            - save_cache:
+                  key: dependency-cache-{{ checksum "package-lock.json" }}
+                  paths:
+                      - ./node_modules
+            - run:
+                  name: install jest
+                  command: npm install @salesforce/sfdx-lwc-jest --save-dev
+            - run:
+                  name: run jest tests
+                  command: npm run test:unit
+            - store_artifacts:
+                  path: test-results.xml
+                  prefix: tests
+            - store_test_results:
+                  path: test-results.xml
+    run_apex_tests:
+        # docker:
+        #   - image: appsolutely/sfdx_circleci_container:latest
+        steps:
+            - checkout
+            - run:
+                  name: login into devhub
+                  command: |
+                      mkdir keys
+                      echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
+                      openssl rsa -in keys/hub.key -check -noout
+                      sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile keys/hub.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
+            - run:
+                  name: create scratch org
+                  command: sfdx force:org:create -s -f config/project-scratch-def.json -a circle_build_$CIRCLE_BUILD_NUM
+            - run:
+                  name: create currencies
+                  command: sfdx force:data:tree:import -f data/CurrencyType.json
+            - run:
+                  name: push source to scratch org
+                  command: sfdx force:source:push -u circle_build_$CIRCLE_BUILD_NUM
+            - run:
+                  name: create user for role
+                  command: sfdx force:user:create --definitionfile scripts/user-def.json
+            - run:
+                  name: run configuration apex
+                  command: sfdx force:apex:execute -f scripts/ciconfig.apex
+            # - run:
+            #       name: run apex tests
+            #       command: |
+            #           mkdir -p tests/junit
+            #           sfdx force:apex:test:run -d tests/junit -r junit --tests SurveyControllerTest,AnswerGenerationTest
+            - store_test_results:
+                  path: tests/junit
+            - store_artifacts:
+                  path: tests/junit
+            - run:
+                  name: delete scratch org
+                  when: always
+                  command: |
+                      sfdx force:org:delete -u circle_build_$CIRCLE_BUILD_NUM -p
 
-### Uncomment the following if performing deployments
-#deployment:
-#  override:
-#    - sfdx force:source:convert -r force-app -d testDeploy
-#    - . cleanupDeploy.sh
-#    - sfdx force:mdapi:deploy -d testDeploy/ -u deploy -w 2
+#     deploy_beta:
+#         # docker:
+#         #     - image: appsolutely/sfdx_circleci_container:latest
+#         steps:
+#             - checkout
+#             - run:
+#                   name: login into devhub
+#                   command: |
+#                       mkdir keys
+#                       echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
+#                       openssl rsa -in keys/hub.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile keys/hub.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
+#             - run:
+#                   name: convert to mdapi format
+#                   command: |
+#                       sfdx force:source:convert --outputdir mdapi_output_dir --packagename $PACKAGE_2_NAME
+#             - run:
+#                   name: add postinstall script
+#                   command: |
+#                       if [[ ! -z "$POST_INSTALL_SCRIPT" ]] ; then
+#                         sed -i 's/<fullName>/<postInstallClass>'"$POST_INSTALL_SCRIPT"'<\/postInstallClass><fullName>/' mdapi_output_dir/package.xml
+#                       fi
+#             - run:
+#                   name: add uninstall script
+#                   command: |
+#                       if [[ ! -z "$UNINSTALL_SCRIPT" ]] ; then
+#                         sed -i 's/<fullName>/<uninstallClass>'"$UNINSTALL_SCRIPT"'<\/uninstallClass><fullName>/' mdapi_output_dir/package.xml
+#                       fi
+#             - run:
+#                   name: add configuration link
+#                   command: |
+#                       if [[ ! -z "$CONFIGURATION_LINK" ]] ; then
+#                         sed -i 's/<fullName>/<setupWeblink>'"$CONFIGURATION_LINK"'<\/setupWeblink><fullName>/' mdapi_output_dir/package.xml
+#                       fi
+#             - run:
+#                   name: login into packaging org
+#                   command: |
+#                       mkdir keyspackaging
+#                       echo $PACKAGING_2_SERVER_KEY_HEX | xxd -r -ps >> keyspackaging/packaging.key
+#                       openssl rsa -in keyspackaging/packaging.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $PACKAGING_2_CONSUMER_KEY --jwtkeyfile keyspackaging/packaging.key --username $PACKAGING_2_SFDC_USER -a packaging_org
+#             - run:
+#                   name: deploy the metadata to the packaging org
+#                   command: |
+#                       sfdx force:mdapi:deploy --deploydir mdapi_output_dir --targetusername $PACKAGING_2_SFDC_USER --wait 5
+#     build_beta:
+#         docker:
+#             - image: appsolutely/sfdx_circleci_container:latest
+#         steps:
+#             - checkout
+#             - run:
+#                   name: login into devhub
+#                   command: |
+#                       mkdir keys
+#                       echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
+#                       openssl rsa -in keys/hub.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile keys/hub.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
+#             - run:
+#                   name: login into packaging org
+#                   command: |
+#                       mkdir keyspackaging
+#                       echo $PACKAGING_2_SERVER_KEY_HEX | xxd -r -ps >> keyspackaging/packaging.key
+#                       openssl rsa -in keyspackaging/packaging.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $PACKAGING_2_CONSUMER_KEY --jwtkeyfile keyspackaging/packaging.key --username $PACKAGING_2_SFDC_USER -a packaging_org
+#             - run:
+#                   name: build beta package
+#                   command: |
+#                       sfdx force:package1:version:create --packageid $PACKAGE_2_ID --name "$PACKAGE_VERSION_NAME" --targetusername $PACKAGING_2_SFDC_USER --version $PACKAGE_2_MAJOR_VERSION.$PACKAGE_2_MINOR_VERSION --wait 5
+#     install_beta_for_test:
+#         docker:
+#             - image: appsolutely/sfdx_circleci_container:latest
+#         steps:
+#             - checkout
+#             - run:
+#                   name: login into devhub
+#                   command: |
+#                       mkdir keys
+#                       echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
+#                       openssl rsa -in keys/hub.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile keys/hub.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
+#             - run:
+#                   name: login into packaging org
+#                   command: |
+#                       mkdir keyspackaging
+#                       echo $PACKAGING_2_SERVER_KEY_HEX | xxd -r -ps >> keyspackaging/packaging.key
+#                       openssl rsa -in keyspackaging/packaging.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $PACKAGING_2_CONSUMER_KEY --jwtkeyfile keyspackaging/packaging.key --username $PACKAGING_2_SFDC_USER -a packaging_org
+#             - run:
+#                   name: get latest package version
+#                   command: |
+#                       export PACKAGE_VERSION_ID=$(sfdx force:package1:version:list --packageid $PACKAGE_ID --targetusername $PACKAGING_2_SFDC_USER --json | jq '.result[-1].MetadataPackageVersionId' -r)
+#             - run:
+#                   name: create scratch org
+#                   command: sfdx force:org:create -s -f config/project-scratch-def.json -a test_circle_build_$CIRCLE_BUILD_NUM
+#             - run:
+#                   name: deploy to scratch org
+#                   command: sfdx force:package:install -i $PACKAGE_VERSION_ID -r -p 5 -u test_circle_build_$CIRCLE_BUILD_NUM -w 5
+
+#     #      - run:
+#     #          name: create scratch org
+#     #          command:
+#     #            sfdx force:org:create -s -f config/project-scratch-def.json -a $PACKAGE_VERSION_NAME
+#     #      - run:
+#     #          name: install beta managed package
+#     #          # using source so the install.sh script can use the env variables set in the build environment and this script
+#     #          command: |
+#     #
+#     create_managed_package:
+#         docker:
+#             - image: appsolutely/sfdx_circleci_container:latest
+#         steps:
+#             - run:
+#                   name: login into devhub
+#                   command: |
+#                       mkdir keys
+#                       echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
+#                       openssl rsa -in keys/hub.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile keys/hub.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
+#             - run:
+#                   name: login into packaging org
+#                   command: |
+#                       mkdir keyspackaging
+#                       echo $PACKAGING_2_SERVER_KEY_HEX | xxd -r -ps >> keyspackaging/packaging.key
+#                       openssl rsa -in keyspackaging/packaging.key -check -noout
+#                       sfdx force:auth:jwt:grant --clientid $PACKAGING_2_CONSUMER_KEY --jwtkeyfile keyspackaging/packaging.key --username $PACKAGING_2_SFDC_USER -a packaging_org
+#             - run:
+#                   name: build managed package
+#                   command: |
+#                       sfdx force:package1:version:create --packageid $PACKAGE_2_ID --name "$PACKAGE_VERSION_NAME" --targetusername $PACKAGING_2_SFDC_USER --version $PACKAGE_2_MAJOR_VERSION.PACKAGE_2_MINOR_VERSION --managedreleased --wait 5
+#             - run:
+#                   name: merge into master
+#                   command: |
+#                       git checkout master
+#                       git merge $CIRCLE_BRANCH
+#                       git push origin master
+#                       git tag -a v$PACKAGE_MAJOR_VERSION.$CIRCLE_BUILD_NUM -m "$PACKAGE_VERSION_NAME v$PACKAGE_MAJOR_VERSION.$CIRCLE_BUILD_NUM"
+#                       git push origin --tags
+
+# workflows:
+#     version: 2
+#     apex_tests-beta_package-release:
+#         jobs:
+#             - run_jest_tests
+#             - run_apex_tests:
+#                   requires:
+#                       - run_jest_tests
+#             - deploy_beta:
+#                   requires:
+#                       - run_apex_tests
+#                   filters:
+#                       branches:
+#                           only: /release\/.*/
+#             - hold_before_build_beta:
+#                   type: approval
+#                   requires:
+#                       - deploy_beta
+#                   filters:
+#                       branches:
+#                           only: /release\/.*/
+#             - build_beta:
+#                   requires:
+#                       - hold_before_build_beta
+#                   filters:
+#                       branches:
+#                           only: /release\/.*/
+#             - install_beta_for_test:
+#                   requires:
+#                       - build_beta
+#                   filters:
+#                       branches:
+#                           only: /release\/.*/
+#             - hold_before_build_managed:
+#                   type: approval
+#                   requires:
+#                       - build_beta
+#                   filters:
+#                       branches:
+#                           only:
+#                               - /release\/.*/
+#                       tags:
+#                           only:
+#                               - /v[0-9]+(\.[0-9]+)+/
+#             - create_managed_package:
+#                   requires:
+#                       - hold_before_build_managed
+#                   filters:
+#                       branches:
+#                           only:
+#                               - /release\/.*/
+#                       tags:
+#                           only:
+#                               - /v[0-9]+(\.[0-9]+)+/
