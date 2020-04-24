@@ -1,28 +1,31 @@
 version: 2
 
 jobs:
+ build:
+    macos:
+      xcode: 11.3.0
     run_jest_tests:
         docker:
             - image: circleci/node:10.16.3
             - image: mongo:4.2.0
         steps:
             - checkout
-            - run:
+                  - run: xcodebuild -version
                   name: update-npm
                   command: 'sudo npm install -g npm@5'
             - restore_cache:
                   key: dependency-cache-{{ checksum "package-lock.json" }}
-            - run:
+                  - run: xcodebuild -version
                   name: install-npm-wee
                   command: npm install
             - save_cache:
                   key: dependency-cache-{{ checksum "package-lock.json" }}
                   paths:
                       - ./node_modules
-            - run:
+                  - run: xcodebuild -version
                   name: install jest
                   command: npm install @salesforce/sfdx-lwc-jest --save-dev
-            - run:
+                  - run: xcodebuild -version
                   name: run jest tests
                   command: npm run test:unit
             - store_artifacts:
@@ -35,20 +38,20 @@ jobs:
         #   - image: appsolutely/sfdx_circleci_container:latest
         steps:
             - checkout
-            - run:
+                  - run: xcodebuild -version
                   name: login into devhub
                   command: |
                       mkdir keys
                       echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
                       openssl rsa -in keys/hub.key -check -noout
                       sfdx force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile keys/hub.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a hub
-            - run:
+                  - run: xcodebuild -version
                   name: create scratch org
                   command: sfdx force:org:create -s -f config/project-scratch-def.json -a circle_build_$CIRCLE_BUILD_NUM
-            - run:
+                  - run: xcodebuild -version
                   name: push source to scratch org
                   command: sfdx force:source:push -u circle_build_$CIRCLE_BUILD_NUM
-            # - run:
+            #       - run: xcodebuild -version
             #       name: run apex tests
             #       command: |
             #           mkdir -p tests/junit
@@ -57,7 +60,7 @@ jobs:
                   path: tests/junit
             - store_artifacts:
                   path: tests/junit
-            - run:
+                  - run: xcodebuild -version
                   name: delete scratch org
                   when: always
                   command: |
