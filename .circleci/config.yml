@@ -1,6 +1,7 @@
 version: 2
 
 jobs:
+    machine: true
     run_jest_tests:
         docker:
             - image: circleci/node:10.16.3
@@ -31,6 +32,7 @@ jobs:
             - store_test_results:
                   path: test-results.xml
     run_apex_tests:
+     machine: true
         # docker:
         #   - image: appsolutely/sfdx_circleci_container:latest
         steps:
@@ -46,17 +48,8 @@ jobs:
                   name: create scratch org
                   command: sfdx force:org:create -s -f config/project-scratch-def.json -a circle_build_$CIRCLE_BUILD_NUM
             - run:
-                  name: create currencies
-                  command: sfdx force:data:tree:import -f data/CurrencyType.json
-            - run:
                   name: push source to scratch org
                   command: sfdx force:source:push -u circle_build_$CIRCLE_BUILD_NUM
-            - run:
-                  name: create user for role
-                  command: sfdx force:user:create --definitionfile scripts/user-def.json
-            - run:
-                  name: run configuration apex
-                  command: sfdx force:apex:execute -f scripts/ciconfig.apex
             # - run:
             #       name: run apex tests
             #       command: |
