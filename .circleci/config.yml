@@ -79,7 +79,8 @@ jobs:
 
                       sfdx force:auth:list
                   name: Run your SFDX commands here
-
+orbs:
+    salesforce-sfdx: circleci/salesforce-sfdx@1.0.0
 version: 2.1
 workflows:
     basic-test:
