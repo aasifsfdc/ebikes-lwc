@@ -2,7 +2,7 @@ version: 2
 jobs:
     build:
         docker:
-            - image: circleci/openjdk:latest-node-browsers
+            - image: circleci/node:latest
         steps:
             - checkout
             - restore_cache:
@@ -26,18 +26,14 @@ jobs:
             - run:
                   name: Create Scratch Org
                   command: |
-                      openssl aes-256-cbc -k $KEY -in assets/server.key.enc -out assets/server.key -d -md md5
-                      node_modules/sfdx-cli/bin/run force:auth:jwt:grant --clientid $CONSUMERKEY --jwtkeyfile assets/server.key --username $USERNAME --setdefaultdevhubusername -a DevHub
+                      openssl aes-256-cbc -k $SFDX_JWT_KEY -in assets/server.key.enc -out assets/server.key -d
+                      node_modules/sfdx-cli/bin/run force:auth:jwt:grant --clientid $SFDX_CONSUMER_KEY --jwtkeyfile assets/server.key --username $HUB_SFDC_USER --setdefaultdevhubusername -a DevHub
                       node_modules/sfdx-cli/bin/run force:org:create -v DevHub -s -f config/project-scratch-def.json -a scratch
             - run:
                   name: Remove Server Key
                   when: always
                   command: |
                       rm assets/server.key
-            - run:
-                  name: Install Lightning Testing Service
-                  command: |
-                      node_modules/sfdx-cli/bin/run force:lightning:test:install -t jasmine
             - run:
                   name: Push Source
                   command: |
@@ -48,11 +44,6 @@ jobs:
                       mkdir ~/tests
                       mkdir ~/tests/apex
                       node_modules/sfdx-cli/bin/run force:apex:test:run -u scratch -c -r human -d ~/tests/apex -w 9999
-            - run:
-                  name: Run Lightning Tests
-                  command: |
-                      mkdir ~/tests/lightning
-                      node_modules/sfdx-cli/bin/run force:lightning:test:run -d ~/tests/lightning -r human -a lightningTests.app -o
             - run:
                   name: Push to Codecov.io (Optional Step)
                   command: |
