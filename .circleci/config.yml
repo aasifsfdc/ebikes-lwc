@@ -2,8 +2,7 @@ version: 2
 
 jobs:
     build:
-        macos:
-            xcode: 11.3.0
+        executor: default
         run_jest_tests:
             docker:
                 - image: circleci/node:10.16.3
