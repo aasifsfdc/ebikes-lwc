@@ -32,7 +32,6 @@ jobs:
             - store_test_results:
                   path: test-results.xml
     run_apex_tests:
-     machine: true
         # docker:
         #   - image: appsolutely/sfdx_circleci_container:latest
         steps:
