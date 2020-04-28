@@ -32,7 +32,7 @@ version: 2
   #         prefix: tests
   #     - store_test_results:
   #         path: test-results.xml
-job:
+jobs:
 run_apex_tests:
     docker:
      - image: circleci/node:latest
@@ -79,10 +79,10 @@ workflows:
   version: 2
   apex_tests-beta_package-release:
     jobs:
-      - run_jest_tests
+      # - run_jest_tests
       - run_apex_tests:
-          requires:
-            - run_jest_tests
+          # requires:
+          #   - run_jest_tests
       - deploy_beta:
           requires:
             - run_apex_tests
