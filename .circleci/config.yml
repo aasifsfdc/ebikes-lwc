@@ -79,7 +79,7 @@ workflows:
   apex_tests-beta_package-release:
     jobs:
       # - run_jest_tests
-      - run_apex_tests
+      - run_apex_tests:
       - deploy_beta:
           requires:
             - run_apex_tests
