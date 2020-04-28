@@ -20,7 +20,7 @@ jobs:
             # //mkdir keys
             # //echo $SFDX_JWT_KEY | xxd -r -ps >> keys/hub.key
             # //openssl rsa -in keys/hub.key -check -noout
-                node_modules/sfdx-cli/bin/run sfdx force:auth:jwt:grant --clientid 3MVG91BJr_0ZDQ4sKOWsrBpEmM_cNBfeSjgz1d7SAHDVOfeq6dnxGXpaW2w9RVpYfPpZDD8Khch4nj0mqtQCc \
+                node_modules/sfdx-cli/bin/run force:auth:jwt:grant --clientid 3MVG91BJr_0ZDQ4sKOWsrBpEmM_cNBfeSjgz1d7SAHDVOfeq6dnxGXpaW2w9RVpYfPpZDD8Khch4nj0mqtQCc \
                 --jwtkeyfile /Users/Asif/JWT/server.key --username siflearnsalesforce@salesforce.com \
                --setdefaultdevhubusername --setalias my-hub-org
            
