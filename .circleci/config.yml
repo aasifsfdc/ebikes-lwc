@@ -32,7 +32,7 @@ version: 2
   #         prefix: tests
   #     - store_test_results:
   #         path: test-results.xml
-jobs:
+job:
 run_apex_tests:
     docker:
      - image: circleci/node:latest
