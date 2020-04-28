@@ -1,38 +1,38 @@
 version: 2
  
-
-  # run_jest_tests:
-  #   docker:
-  #     - image: circleci/node:10.16.3
-  #     - image: mongo:4.2.0
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: update-npm
-  #         command: 'sudo npm install -g npm@5'
-  #     - restore_cache:
-  #         key: dependency-cache-{{ checksum "package-lock.json" }}
-  #     - run:
-  #         name: install-npm-wee
-  #         command: npm install
-  #     - save_cache:
-  #         key: dependency-cache-{{ checksum "package-lock.json" }}
-  #         paths:
-  #           - ./node_modules
-  #     - run:
-  #         name: install jest
-  #         command:
-  #           npm install @salesforce/sfdx-lwc-jest --save-dev
-  #     - run:
-  #         name: run jest tests
-  #         command:
-  #           npm run test:unit
-  #     - store_artifacts:
-  #         path: test-results.xml
-  #         prefix: tests
-  #     - store_test_results:
-  #         path: test-results.xml
 jobs:
+   run_jest_tests:
+     docker:
+       - image: circleci/node:10.16.3
+       - image: mongo:4.2.0
+     steps:
+       - checkout
+       - run:
+           name: update-npm
+           command: 'sudo npm install -g npm@5'
+       - restore_cache:
+           key: dependency-cache-{{ checksum "package-lock.json" }}
+       - run:
+           name: install-npm-wee
+           command: npm install
+       - save_cache:
+           key: dependency-cache-{{ checksum "package-lock.json" }}
+           paths:
+             - ./node_modules
+       - run:
+           name: install jest
+           command:
+             npm install @salesforce/sfdx-lwc-jest --save-dev
+       - run:
+           name: run jest tests
+           command:
+             npm run test:unit
+       - store_artifacts:
+           path: test-results.xml
+           prefix: tests
+       - store_test_results:
+           path: test-results.xml
+
 run_apex_tests:
     docker:
      - image: circleci/node:latest
@@ -79,10 +79,8 @@ workflows:
   version: 2
   apex_tests-beta_package-release:
     jobs:
-      # - run_jest_tests
-      - run_apex_tests:
-          # requires:
-          #   - run_jest_tests
+      - run_jest_tests
+      - run_apex_tests
       - deploy_beta:
           requires:
             - run_apex_tests
