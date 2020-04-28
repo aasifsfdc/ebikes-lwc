@@ -1,6 +1,6 @@
 version: 2
  
-jobs:
+
   # run_jest_tests:
   #   docker:
   #     - image: circleci/node:10.16.3
@@ -32,6 +32,7 @@ jobs:
   #         prefix: tests
   #     - store_test_results:
   #         path: test-results.xml
+jobs:
 run_apex_tests:
     docker:
      - image: circleci/node:latest
