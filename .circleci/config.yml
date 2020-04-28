@@ -74,6 +74,60 @@ run_apex_tests:
           when: always
           command: |
             sfdx force:org:delete -u circle_build_$CIRCLE_BUILD_NUM -p
+workflows:
+  version: 2
+  apex_tests-beta_package-release:
+    jobs:
+      - run_jest_tests
+      - run_apex_tests:
+          requires:
+            - run_jest_tests
+      - deploy_beta:
+          requires:
+            - run_apex_tests
+          filters:
+            branches:
+              only: /release\/.*/
+      - hold_before_build_beta:
+          type: approval
+          requires:
+            - deploy_beta
+          filters:
+            branches:
+              only: /release\/.*/
+      - build_beta:
+          requires:
+            - hold_before_build_beta
+          filters:
+            branches:
+              only: /release\/.*/
+      - install_beta_for_test:
+          requires:
+            - build_beta
+          filters:
+            branches:
+              only: /release\/.*/
+      - hold_before_build_managed:
+          type: approval
+          requires:
+            - build_beta
+          filters:
+            branches:
+              only:
+                - /release\/.*/
+            tags:
+              only:
+                - /v[0-9]+(\.[0-9]+)+/
+      - create_managed_package:
+          requires:
+            - hold_before_build_managed
+          filters:
+            branches:
+              only:
+                - /release\/.*/
+            tags:
+              only:
+                - /v[0-9]+(\.[0-9]+)+/
 # version: 2.1
 # jobs:
 #   build:
